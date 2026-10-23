@@ -94,14 +94,18 @@ void IoContext::open() {
     rclcpp::init(argc, argv, opts);
   }
   g_bridge.node = std::make_shared<rclcpp::Node>("training_vision");
+  // 仿真器：/image_raw 用默认(reliable) QoS 发布；/vision_receive_data 用 sensor_data(best_effort) 发布。
+  // 因此订阅需匹配：/image_raw 用默认，/vision_receive_data 用 SensorDataQoS。
+  // /vision_send_data 仿真器用 sensor_data(best_effort) 订阅，故发布也必须用 SensorDataQoS，否则连不上。
+  auto recv_qos = rclcpp::SensorDataQoS();
   g_bridge.node->create_subscription<sensor_msgs::msg::Image>(
       "/image_raw", 10,
       [](const sensor_msgs::msg::Image::SharedPtr m) { g_bridge.on_image(m); });
   g_bridge.node->create_subscription<hnurm_interfaces::msg::VisionRecvData>(
-      "/vision_receive_data", 10,
+      "/vision_receive_data", recv_qos,
       [](const hnurm_interfaces::msg::VisionRecvData::SharedPtr m) { g_bridge.on_recv(m); });
   g_bridge.cmd_pub = g_bridge.node->create_publisher<hnurm_interfaces::msg::VisionSendData>(
-      "/vision_send_data", 10);
+      "/vision_send_data", rclcpp::SensorDataQoS());
   g_bridge.running = true;
   g_bridge.spin_thread = std::thread([]() { rclcpp::spin(g_bridge.node); });
 }
